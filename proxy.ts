@@ -9,15 +9,28 @@ const PUBLIC_API = ['/api/auth/login', '/api/setup']
 export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl
 
+  const isLogin = pathname === '/login'
   const isVault = pathname.startsWith('/vault')
   const isProtectedApi = pathname.startsWith('/api/') && !PUBLIC_API.some(p => pathname.startsWith(p))
 
-  if (!isVault && !isProtectedApi) return NextResponse.next()
+  if (!isLogin && !isVault && !isProtectedApi) return NextResponse.next()
 
   const token = req.cookies.get(COOKIE)?.value
+
+  // Already logged in — skip login page and go straight to vault
+  if (isLogin && token) {
+    try {
+      await jwtVerify(token, SECRET)
+      return NextResponse.redirect(new URL('/vault', req.url))
+    } catch {
+      return NextResponse.next()
+    }
+  }
+
   if (!token) {
     if (isProtectedApi) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    return NextResponse.redirect(new URL('/login', req.url))
+    if (isVault) return NextResponse.redirect(new URL('/login', req.url))
+    return NextResponse.next()
   }
 
   try {
@@ -28,10 +41,11 @@ export async function proxy(req: NextRequest) {
     return res
   } catch {
     if (isProtectedApi) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    return NextResponse.redirect(new URL('/login', req.url))
+    if (isVault) return NextResponse.redirect(new URL('/login', req.url))
+    return NextResponse.next()
   }
 }
 
 export const config = {
-  matcher: ['/vault/:path*', '/api/:path*'],
+  matcher: ['/login', '/vault/:path*', '/api/:path*'],
 }
