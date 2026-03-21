@@ -50,11 +50,8 @@ export async function listObjects(prefix: string): Promise<{ key: string; size: 
 export async function getObject(key: string): Promise<string> {
   const cmd = new GetObjectCommand({ Bucket: BUCKET, Key: key })
   const res = await s3.send(cmd)
-  const chunks: Uint8Array[] = []
-  for await (const chunk of res.Body as AsyncIterable<Uint8Array>) {
-    chunks.push(chunk)
-  }
-  return Buffer.concat(chunks).toString('utf-8')
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (res.Body as any).transformToString()
 }
 
 export async function putObject(key: string, body: string): Promise<void> {

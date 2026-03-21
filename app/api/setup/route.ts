@@ -15,6 +15,10 @@ export async function POST(req: NextRequest) {
   }
 
   const master = process.env.MASTER_USERNAME!
-  await createUser(master, password, 'master')
+  try {
+    await createUser(master, password, 'master')
+  } catch (e) {
+    return NextResponse.json({ error: String(e) }, { status: 500 })
+  }
   return NextResponse.json({ ok: true, username: master })
 }
