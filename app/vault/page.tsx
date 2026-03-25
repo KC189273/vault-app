@@ -100,7 +100,10 @@ export default function VaultPage() {
   async function renameFile() {
     if (!renaming || !renameTo.trim()) return
     const parts = renaming.key.split('/')
-    parts[parts.length - 1] = renameTo.trim()
+    const oldFilename = parts[parts.length - 1]
+    const ext = oldFilename.includes('.') ? '.' + oldFilename.split('.').pop() : ''
+    const newName = renameTo.trim().replace(/\.[^.]+$/, '') // strip any extension the user typed
+    parts[parts.length - 1] = newName + ext
     const newKey = parts.join('/')
     await fetch('/api/files/move', {
       method: 'POST',
@@ -337,7 +340,7 @@ export default function VaultPage() {
               <p className="text-white font-semibold text-sm truncate">{contextFile.filename}</p>
             </div>
             <button className="w-full px-4 py-4 text-left text-sm text-white border-b" style={{ borderColor: '#38383a' }}
-              onClick={() => { setRenaming(contextFile); setRenameTo(contextFile.filename); setContextFile(null) }}>
+              onClick={() => { setRenaming(contextFile); setRenameTo(contextFile.filename.replace(/\.[^.]+$/, '')); setContextFile(null) }}>
               Rename
             </button>
             <button className="w-full px-4 py-4 text-left text-sm text-white border-b" style={{ borderColor: '#38383a' }}
@@ -448,6 +451,8 @@ function MediaTile({ file, onClick, onContext }: { file: MediaFile; onClick: () 
     if (pressTimer.current) clearTimeout(pressTimer.current)
   }
 
+  const displayName = file.filename.replace(/\.[^.]+$/, '')
+
   return (
     <button
       onClick={onClick}
@@ -455,20 +460,24 @@ function MediaTile({ file, onClick, onContext }: { file: MediaFile; onClick: () 
       onTouchStart={startPress}
       onTouchEnd={cancelPress}
       onTouchMove={cancelPress}
-      className="relative aspect-square overflow-hidden"
+      className="flex flex-col overflow-hidden"
       style={{ background: '#111', WebkitTapHighlightColor: 'transparent' }}
     >
-      {file.type === 'image' ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={file.url} alt={file.filename} className="w-full h-full object-cover" loading="lazy" />
-      ) : file.type === 'video' ? (
-        <VideoThumbnail url={file.url} filename={file.filename} />
-      ) : (
-        <div className="w-full h-full flex flex-col items-center justify-center" style={{ background: '#1c1c1e' }}>
-          <span style={{ fontSize: '28px' }}>📄</span>
-          <p className="text-xs mt-1 px-1 text-center line-clamp-2" style={{ color: '#8e8e93' }}>{file.filename}</p>
-        </div>
-      )}
+      <div className="relative w-full aspect-square overflow-hidden">
+        {file.type === 'image' ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={file.url} alt={file.filename} className="w-full h-full object-cover" loading="lazy" />
+        ) : file.type === 'video' ? (
+          <VideoThumbnail url={file.url} filename={file.filename} />
+        ) : (
+          <div className="w-full h-full flex flex-col items-center justify-center" style={{ background: '#1c1c1e' }}>
+            <span style={{ fontSize: '28px' }}>📄</span>
+          </div>
+        )}
+      </div>
+      <p className="w-full px-0.5 py-1 text-center truncate" style={{ fontSize: '9px', color: '#8e8e93', lineHeight: '1.2' }}>
+        {displayName}
+      </p>
     </button>
   )
 }
