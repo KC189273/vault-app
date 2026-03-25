@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import MediaViewer from '@/components/MediaViewer'
 import UploadModal from '@/components/UploadModal'
+import VideoThumbnail from '@/components/VideoThumbnail'
 
 interface MediaFile {
   key: string
@@ -461,13 +462,7 @@ function MediaTile({ file, onClick, onContext }: { file: MediaFile; onClick: () 
         // eslint-disable-next-line @next/next/no-img-element
         <img src={file.url} alt={file.filename} className="w-full h-full object-cover" loading="lazy" />
       ) : file.type === 'video' ? (
-        <div className="w-full h-full flex flex-col items-center justify-center" style={{ background: '#1c1c1e' }}>
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
-            <circle cx="12" cy="12" r="10" stroke="#ff9f0a" strokeWidth="1.5"/>
-            <polygon points="10,8 18,12 10,16" fill="#ff9f0a"/>
-          </svg>
-          <p className="text-xs mt-2 px-1 text-center line-clamp-2" style={{ color: '#8e8e93' }}>{file.filename}</p>
-        </div>
+        <VideoThumbnail url={file.url} filename={file.filename} />
       ) : (
         <div className="w-full h-full flex flex-col items-center justify-center" style={{ background: '#1c1c1e' }}>
           <span style={{ fontSize: '28px' }}>📄</span>
