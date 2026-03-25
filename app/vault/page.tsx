@@ -194,7 +194,7 @@ export default function VaultPage() {
             <p className="mt-3 text-sm" style={{ color: '#48484a' }}>No files yet. Tap + to upload.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-3 gap-0.5">
+          <div className="grid grid-cols-6 gap-0.5">
             {displayedFiles.map(file => (
               <MediaTile key={file.key} file={file} onClick={() => setViewing(file)} />
             ))}
@@ -252,7 +252,7 @@ export default function VaultPage() {
                   ) : userFiles[u.username]?.length === 0 ? (
                     <div className="text-center py-8 text-sm" style={{ color: '#48484a' }}>No files</div>
                   ) : (
-                    <div className="grid grid-cols-3 gap-0.5">
+                    <div className="grid grid-cols-6 gap-0.5">
                       {(userFiles[u.username] ?? []).map(file => (
                         <MediaTile key={file.key} file={file} onClick={() => setViewing(file)} />
                       ))}
