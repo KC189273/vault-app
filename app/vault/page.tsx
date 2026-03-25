@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import MediaViewer from '@/components/MediaViewer'
 import UploadModal from '@/components/UploadModal'
@@ -32,6 +32,12 @@ export default function VaultPage() {
   const [userFiles, setUserFiles] = useState<Record<string, MediaFile[]>>({})
   const [expandedUser, setExpandedUser] = useState<string | null>(null)
   const [loadingUser, setLoadingUser] = useState<string | null>(null)
+  const [contextFile, setContextFile] = useState<MediaFile | null>(null)
+  const [renaming, setRenaming] = useState<MediaFile | null>(null)
+  const [renameTo, setRenameTo] = useState('')
+  const [moving, setMoving] = useState<MediaFile | null>(null)
+  const [moveTo, setMoveTo] = useState('')
+  const [moveToNew, setMoveToNew] = useState('')
 
   useEffect(() => {
     fetch('/api/auth/me').then(r => {
@@ -88,6 +94,39 @@ export default function VaultPage() {
       body: JSON.stringify({ key }),
     })
     setMyFiles(f => f.filter(x => x.key !== key))
+  }
+
+  async function renameFile() {
+    if (!renaming || !renameTo.trim()) return
+    const parts = renaming.key.split('/')
+    parts[parts.length - 1] = renameTo.trim()
+    const newKey = parts.join('/')
+    await fetch('/api/files/move', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ oldKey: renaming.key, newKey }),
+    })
+    setRenaming(null)
+    loadMyFiles(session!.username)
+  }
+
+  async function moveFile() {
+    if (!moving) return
+    const targetFolder = moveToNew.trim() || moveTo
+    const username = moving.key.split('/')[1]
+    const filename = moving.key.split('/').pop()!
+    const newKey = targetFolder
+      ? `users/${username}/${targetFolder}/${filename}`
+      : `users/${username}/${filename}`
+    await fetch('/api/files/move', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ oldKey: moving.key, newKey }),
+    })
+    setMoving(null)
+    setMoveTo('')
+    setMoveToNew('')
+    loadMyFiles(session!.username)
   }
 
   const myFolders = [...new Set(myFiles.filter(f => f.folder).map(f => f.folder!))]
@@ -196,7 +235,7 @@ export default function VaultPage() {
         ) : (
           <div className="grid grid-cols-6 gap-0.5">
             {displayedFiles.map(file => (
-              <MediaTile key={file.key} file={file} onClick={() => setViewing(file)} />
+              <MediaTile key={file.key} file={file} onClick={() => setViewing(file)} onContext={() => setContextFile(file)} />
             ))}
           </div>
         )}
@@ -254,7 +293,7 @@ export default function VaultPage() {
                   ) : (
                     <div className="grid grid-cols-6 gap-0.5">
                       {(userFiles[u.username] ?? []).map(file => (
-                        <MediaTile key={file.key} file={file} onClick={() => setViewing(file)} />
+                        <MediaTile key={file.key} file={file} onClick={() => setViewing(file)} onContext={() => setContextFile(file)} />
                       ))}
                     </div>
                   )}
@@ -284,14 +323,137 @@ export default function VaultPage() {
           onUploaded={() => loadMyFiles(session.username)}
         />
       )}
+
+      {/* Context menu */}
+      {contextFile && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center"
+          style={{ background: 'rgba(0,0,0,0.6)' }}
+          onClick={() => setContextFile(null)}>
+          <div className="w-full max-w-sm rounded-t-2xl overflow-hidden mb-0"
+            style={{ background: '#1c1c1e' }}
+            onClick={e => e.stopPropagation()}>
+            <div className="px-4 py-3 border-b" style={{ borderColor: '#38383a' }}>
+              <p className="text-white font-semibold text-sm truncate">{contextFile.filename}</p>
+            </div>
+            <button className="w-full px-4 py-4 text-left text-sm text-white border-b" style={{ borderColor: '#38383a' }}
+              onClick={() => { setRenaming(contextFile); setRenameTo(contextFile.filename); setContextFile(null) }}>
+              Rename
+            </button>
+            <button className="w-full px-4 py-4 text-left text-sm text-white border-b" style={{ borderColor: '#38383a' }}
+              onClick={() => { setMoving(contextFile); setMoveTo(contextFile.folder ?? ''); setMoveToNew(''); setContextFile(null) }}>
+              Move to Folder
+            </button>
+            <button className="w-full px-4 py-4 text-left text-sm font-medium" style={{ color: '#ff453a' }}
+              onClick={() => { deleteFile(contextFile.key); setContextFile(null) }}>
+              Delete
+            </button>
+            <button className="w-full px-4 py-4 text-sm font-semibold border-t" style={{ borderColor: '#38383a', color: '#ff9f0a' }}
+              onClick={() => setContextFile(null)}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Rename modal */}
+      {renaming && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center"
+          style={{ background: 'rgba(0,0,0,0.6)' }}
+          onClick={() => setRenaming(null)}>
+          <div className="w-full max-w-sm rounded-t-2xl p-5"
+            style={{ background: '#1c1c1e' }}
+            onClick={e => e.stopPropagation()}>
+            <p className="text-white font-semibold mb-4">Rename File</p>
+            <input
+              autoFocus
+              value={renameTo}
+              onChange={e => setRenameTo(e.target.value)}
+              className="w-full px-4 py-3 rounded-xl text-sm outline-none mb-4"
+              style={{ background: '#2c2c2e', color: '#fff', border: '1px solid #48484a' }}
+            />
+            <div className="flex gap-2">
+              <button onClick={renameFile} disabled={!renameTo.trim()}
+                className="flex-1 py-3 rounded-xl text-sm font-semibold disabled:opacity-40"
+                style={{ background: '#ff9f0a', color: '#000' }}>
+                Rename
+              </button>
+              <button onClick={() => setRenaming(null)}
+                className="flex-1 py-3 rounded-xl text-sm font-semibold"
+                style={{ background: '#2c2c2e', color: '#fff' }}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Move to folder modal */}
+      {moving && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center"
+          style={{ background: 'rgba(0,0,0,0.6)' }}
+          onClick={() => setMoving(null)}>
+          <div className="w-full max-w-sm rounded-t-2xl p-5"
+            style={{ background: '#1c1c1e' }}
+            onClick={e => e.stopPropagation()}>
+            <p className="text-white font-semibold mb-4">Move to Folder</p>
+            <div className="flex flex-wrap gap-2 mb-3">
+              <button onClick={() => { setMoveTo(''); setMoveToNew('') }}
+                className="px-3 py-1 rounded-full text-xs"
+                style={{ background: !moveTo && !moveToNew ? '#ff9f0a' : '#2c2c2e', color: !moveTo && !moveToNew ? '#000' : '#8e8e93' }}>
+                No Folder
+              </button>
+              {myFolders.map(f => (
+                <button key={f} onClick={() => { setMoveTo(f); setMoveToNew('') }}
+                  className="px-3 py-1 rounded-full text-xs"
+                  style={{ background: moveTo === f && !moveToNew ? '#ff9f0a' : '#2c2c2e', color: moveTo === f && !moveToNew ? '#000' : '#8e8e93' }}>
+                  {f}
+                </button>
+              ))}
+            </div>
+            <input
+              placeholder="Or create new folder..."
+              value={moveToNew}
+              onChange={e => { setMoveToNew(e.target.value); setMoveTo('') }}
+              className="w-full px-4 py-3 rounded-xl text-sm outline-none mb-4"
+              style={{ background: '#2c2c2e', color: '#fff', border: '1px solid #48484a' }}
+            />
+            <div className="flex gap-2">
+              <button onClick={moveFile}
+                className="flex-1 py-3 rounded-xl text-sm font-semibold"
+                style={{ background: '#ff9f0a', color: '#000' }}>
+                Move
+              </button>
+              <button onClick={() => setMoving(null)}
+                className="flex-1 py-3 rounded-xl text-sm font-semibold"
+                style={{ background: '#2c2c2e', color: '#fff' }}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
 
-function MediaTile({ file, onClick }: { file: MediaFile; onClick: () => void }) {
+function MediaTile({ file, onClick, onContext }: { file: MediaFile; onClick: () => void; onContext: () => void }) {
+  const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  function startPress() {
+    pressTimer.current = setTimeout(() => onContext(), 500)
+  }
+
+  function cancelPress() {
+    if (pressTimer.current) clearTimeout(pressTimer.current)
+  }
+
   return (
     <button
       onClick={onClick}
+      onContextMenu={e => { e.preventDefault(); onContext() }}
+      onTouchStart={startPress}
+      onTouchEnd={cancelPress}
+      onTouchMove={cancelPress}
       className="relative aspect-square overflow-hidden"
       style={{ background: '#111', WebkitTapHighlightColor: 'transparent' }}
     >

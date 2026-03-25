@@ -1,4 +1,4 @@
-import { S3Client, GetObjectCommand, PutObjectCommand, DeleteObjectCommand, ListObjectsV2Command } from '@aws-sdk/client-s3'
+import { S3Client, GetObjectCommand, PutObjectCommand, DeleteObjectCommand, ListObjectsV2Command, CopyObjectCommand } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 
 export const s3 = new S3Client({
@@ -52,6 +52,11 @@ export async function getObject(key: string): Promise<string> {
   const res = await s3.send(cmd)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return (res.Body as any).transformToString()
+}
+
+export async function moveObject(oldKey: string, newKey: string): Promise<void> {
+  await s3.send(new CopyObjectCommand({ Bucket: BUCKET, CopySource: `${BUCKET}/${oldKey}`, Key: newKey }))
+  await s3.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: oldKey }))
 }
 
 export async function putObject(key: string, body: string): Promise<void> {
